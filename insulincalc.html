@@ -1,0 +1,162 @@
+<html lang="sv">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {
+                font-size: 1em;
+                display: flex;
+                justify-content: center;
+            }
+            
+            input {
+                width: 5em;
+                font-size: 1em;
+            }
+            
+            label {
+                padding-right: 12px;
+            }
+            
+            button {
+                font-size: 1em;
+            }
+            
+            .usageComment{
+                font-size: 0.8em;
+                padding-top: 10px;
+            }
+
+            .group{
+                padding-top: 20px;
+                padding-bottom: 20px;
+            }
+            .resultGroup{
+                padding-top: 20px;
+                padding-bottom: 20px;
+            }
+
+            .row {
+                display: table-row;
+            }
+
+            .row label {
+                display: table-cell;
+            }
+
+            .row input {
+                display: table-cell;
+            }
+        </style>
+    </head>
+    <body onload="onLoad()">
+        <div>
+            <div class="group">
+                <div class="row">
+                    <label for="carbQuotient">Kolhydratskvot: </label><input type="number" name="carbQuotient" id="carbQuotient" min="1"/>
+                </div>
+                <div class="row">
+                    <label for="correctionQuotient">Korrektionskvot: </label><input type="number" name="correctionQuotient" id="correctionQuotient" step="0.1" min="1"/>
+                </div>
+                <div class="row">
+                    <label for="targetbloodsugar">Målvärde för blodsocker: </label><input type="number" name="targetbloodsugar" id="targetbloodsugar" min="5" value="6"/>
+                </div>
+            </div>
+            <div class="group">
+                <div class="row">
+                    <label for="carbs">Antal Kolhydrater: </label><input type="number" name="carbs" id="carbs" step="0.1" />
+                </div>
+                <div class="row">
+                    <label for="bloodsugar">Blodsockervärde: </label><input type="number" name="bloodsugar" id="bloodsugar" step="0.1"/>
+                </div>
+            </div>
+
+            <button onclick="calculate()">Beräkna</button>
+
+            <div class="resultGroup">
+                <div class="usageComment">Detta värde är det som oftast ska användas, men <b>inte</b> om annan insulindos getts inom 2h.</div>
+                <div class="row">
+                    <label for="totalInsulin"><b>Total mängd insulin</b>: </label><input type="text" id="totalInsulin" name="totalInsulin" disabled /> E 
+                </div>
+                <div class="row">
+                    Beräkning:
+                    <span id="totalInsulinCommentary"></span>
+                </div>
+                <div class="usageComment">Detta värde används om insulin ska ges för mat, men en annan dos insulin har redan getts de senaste 2h.</div>
+                <div class="row">
+                    <label for="foodInsulin"><b>Insulin för måltid</b>: </label><input type="text" id="foodInsulin" name="foodInsulin" disabled /> E
+                </div>
+                <div class="row">
+                    Beräkning:
+                    <span id="foodInsulinCommentary"></span>
+                </div>
+                <div class="usageComment">Detta värde används endast om en korrektion ska göras, tex om blodsockret fortfarande är högt 2h efter måltid.</div>
+                <div class="row">
+                    <label for="correctionInsulin"><b>Insulin för korrektion</b>: </label><input type="text" id="correctionInsulin" name="correctionInsulin" disabled /> E
+                </div>
+                <div class="row">
+                    Beräkning:
+                    <span id="correctionInsulinCommentary"></span>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function onLoad(){
+                const targetbloodsugar = localStorage.getItem('targetbloodsugar');
+                const carbQuotient = localStorage.getItem('carbQuotient');
+                const correctionQuotient = localStorage.getItem('correctionQuotient');
+
+                if(correctionQuotient){
+                    document.getElementById('correctionQuotient').value = correctionQuotient;
+                }
+                if(carbQuotient){
+                    document.getElementById('carbQuotient').value = carbQuotient;
+                }
+                if(targetbloodsugar){
+                    document.getElementById('targetbloodsugar').value = targetbloodsugar;;
+                }
+            }
+
+            function calculate(){
+                const correctionQuotientElement = document.getElementById('correctionQuotient');
+                const carbQuotientElement = document.getElementById('carbQuotient');
+                const targetbloodsugarElement = document.getElementById('targetbloodsugar');
+
+                const carbsElement = document.getElementById('carbs');
+                const bloodsugar = document.getElementById('bloodsugar');
+                
+                const correctionInsulinElement = document.getElementById('correctionInsulin');
+                const foodInsulinElement = document.getElementById('foodInsulin');
+                const totalInsulin = document.getElementById('totalInsulin');
+
+                const correctionInsulinCommentaryElement = document.getElementById('correctionInsulinCommentary');
+                const foodInsulinCommentaryElement = document.getElementById('foodInsulinCommentary');
+                const totalInsulinCommentary = document.getElementById('totalInsulinCommentary');
+
+                const targetbloodsugar = targetbloodsugarElement.valueAsNumber;
+                const carbQuotient = carbQuotientElement.valueAsNumber;
+                const correctionQuotient = correctionQuotientElement.valueAsNumber;
+                const carbs = carbsElement.valueAsNumber | 0;
+
+                localStorage.setItem('targetbloodsugar', targetbloodsugar);
+                localStorage.setItem('carbQuotient', carbQuotient);
+                localStorage.setItem('correctionQuotient', correctionQuotient);
+
+                const foodInsulin = carbs / carbQuotientElement.valueAsNumber;
+                foodInsulinElement.value = foodInsulin.toFixed(2);
+
+                const stepsToLowerBloodsugar = bloodsugar.valueAsNumber - targetbloodsugarElement.valueAsNumber;
+                const correctionInsulin = stepsToLowerBloodsugar / correctionQuotientElement.valueAsNumber;
+                correctionInsulinElement.value = correctionInsulin.toFixed(2);
+                totalInsulin.value = (correctionInsulin + foodInsulin).toFixed(2);
+
+                correctionInsulinCommentaryElement.innerHTML = `(${bloodsugar.valueAsNumber} - ${targetbloodsugarElement.valueAsNumber} = ${stepsToLowerBloodsugar} => ${stepsToLowerBloodsugar} / ${correctionQuotientElement.valueAsNumber})`;
+                foodInsulinCommentaryElement.innerHTML = `(${carbs} / ${carbQuotientElement.valueAsNumber})`;
+                totalInsulinCommentary.innerHTML = `(${correctionInsulin.toFixed(2)} + ${foodInsulin.toFixed(2)})`;
+
+
+            }
+        </script>
+    </body>
+</html>
