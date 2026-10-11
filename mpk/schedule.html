@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schema</title>
+
+<style>
+  :root{
+    --time-width: 72px;
+    --header-height: 44px;
+    --row-height: 22px;
+    --line: #d9dce1;
+    --text: #20242a;
+    --muted: #68707a;
+    --bg: #f4f5f7;
+
+    /*
+      Färgpar (bakgrund / text). Alla par har kontrast >= 4.5:1
+      (WCAG 2.x AA för normal text).
+    */
+    --text-dark: #1b1f24;
+    --text-light: #ffffff;
+
+    --yellow-bg: #ffe599;      /* 13.3:1 */
+    --green-bg: #b6d7a8;       /* 10.5:1 */
+    --green-dark-bg: #38761d;  /*  5.6:1 */
+    --blue-bg: #2a63c8;        /*  5.7:1 */
+    --blue-light-bg: #a4c2f4;  /*  9.2:1 */
+    --purple-bg: #b4a7d6;      /*  7.4:1 */
+    --red-bg: #c00000;         /*  6.5:1 */
+    --orange-bg: #ff9900;      /*  7.7:1 */
+    --grey-bg: #e8eaed;        /* 13.7:1 */
+    --teal-bg: #2a7a5c;        /*  5.2:1 */
+    --mint-bg: #5eeabd;        /* 11.0:1 */
+  }
+
+  *{
+    box-sizing:border-box
+  }
+
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--text);
+    background:white;
+  }
+
+  #schedules{
+    display:flex;
+    flex-direction:column;
+    gap:32px;               /* avstånd mellan scheman */
+  }
+
+  .schedule-title{
+    margin:0 0 8px;
+    font-size:18px;
+  }
+
+  .schedule-wrap{
+    width:100%;
+    overflow-x:auto;        /* bara sidled vid smala skärmar */
+    overflow-y:hidden;      /* aldrig vertikal scroll i schemat */
+    padding-bottom:8px;     /* plats för sista tidsetiketten som sticker ut nedåt */
+    -webkit-overflow-scrolling:touch;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:white;
+  }
+
+  /* Kolumnbredder och min-width sätts per schema från JavaScript */
+  .schedule{
+    display:grid;
+    grid-template-rows:var(--header-height) 1fr;
+  }
+
+  .corner{
+    position:sticky;
+    left:0;
+    z-index:5;
+    background:white;
+    border-right:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+  }
+
+  .day{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    background:white;
+    border-bottom:1px solid var(--line);
+    border-right:1px solid var(--line);
+  }
+
+  .time-column{
+    position:sticky;
+    left:0;
+    z-index:4;
+    background:white;
+    border-right:1px solid var(--line);
+  }
+
+  .time{
+    position:absolute;
+    right:8px;
+    transform:translateY(-50%);
+    font-size:11px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .day-column{
+    position:relative;
+    background-color:var(--bg);
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(var(--row-height) - 1px),
+        var(--line) calc(var(--row-height) - 1px),
+        var(--line) var(--row-height)
+      );
+    border-right:1px solid var(--line);
+  }
+
+  .event{
+    position:absolute;
+    border-radius:4px;
+    padding:5px 6px;
+    overflow:hidden;
+
+    border:1px solid rgba(0,0,0,.12);
+
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+
+    text-align:center;
+    line-height:1.12;
+    font-size:12px;
+    font-weight:650;
+
+    box-shadow:0 1px 2px rgba(0,0,0,.08);
+
+    /* Gör att parallella pass får lite luft mellan sig */
+    margin-left:2px;
+    margin-right:2px;
+  }
+
+  .event small{
+    display:block;
+    margin-top:3px;
+    font-size:10px;
+    font-weight:500;
+    /* ingen opacity: skulle sänka kontrasten */
+  }
+
+  .yellow{     background:var(--yellow-bg);     color:var(--text-dark) }
+  .green{      background:var(--green-bg);      color:var(--text-dark) }
+  .green-dark{ background:var(--green-dark-bg); color:var(--text-light) }
+  .blue{       background:var(--blue-bg);       color:var(--text-light) }
+  .blue-light{ background:var(--blue-light-bg); color:var(--text-dark) }
+  .purple{     background:var(--purple-bg);     color:var(--text-dark) }
+  .red{        background:var(--red-bg);        color:var(--text-light) }
+  .orange{     background:var(--orange-bg);     color:var(--text-dark) }
+  .grey{       background:var(--grey-bg);       color:var(--text-dark) }
+  .teal{       background:var(--teal-bg);       color:var(--text-light) }
+  .mint{       background:var(--mint-bg);       color:var(--text-dark) }
+  
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px 16px;
+    padding:12px 4px 0;
+    font-size:13px;
+  }
+
+  .legend span{
+    display:flex;
+    align-items:center;
+    gap:6px
+  }
+
+  .swatch{
+    width:13px;
+    height:13px;
+    border-radius:3px;
+    border:1px solid rgba(0,0,0,.1)
+  }
+
+  .help{
+    margin:12px 0 0;
+    padding:12px;
+    border-radius:8px;
+    background:#f5f6f8;
+    color:#4d5560;
+    font-size:13px;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="schedules"></div>
+
+<div class="legend">
+  <span><i class="swatch yellow"></i>Grund Åk 1–3</span>
+  <span><i class="swatch green"></i>Grund Åk 4–6</span>
+  <span><i class="swatch green-dark"></i>Fortsättning Åk 4–6</span>
+  <span><i class="swatch orange"></i>Avancerad Åk 4–6</span>
+  <span><i class="swatch blue"></i>Fortsättning 13+ år</span>
+  <span><i class="swatch blue-light"></i>Grund 13–20 år</span>
+  <span><i class="swatch purple"></i>Grund 21+ år</span>
+  <span><i class="swatch red"></i>Avancerad 13+ år</span>
+  <span><i class="swatch grey"></i>Open Gym</span>
+  <span><i class="swatch teal"></i>Barn Parkour</span>
+  <span><i class="swatch mint"></i>Familj Parkour</span>
+  <span><i class="swatch red"></i>Kalas / Event / Uthyrning</span>
+</div>
+
+<div class="help">
+  <strong>Redigering:</strong> ändra bara <code>SCHEDULES</code> längst ned.
+  Tider anges som <code>"17:00"</code> och varje aktivitet får automatiskt rätt höjd och position.
+  Aktiviteter som överlappar varandra placeras automatiskt bredvid varandra.
+</div>
+
+
+<script>
+
+/*
+  ============================================================
+  ENKEL REDIGERING – ändra bara SCHEDULES
+  ============================================================
+
+  Varje schema har:
+    title   rubrik ovanför schemat (valfri)
+    days    kolumnrubriker
+    start   tidigaste tid på tidsaxeln
+    end     senaste tid på tidsaxeln
+    events  aktiviteter
+
+  I en aktivitet är "day" index i schemats egen days-lista:
+    0 = första kolumnen, 1 = andra kolumnen, osv.
+
+  Om två eller flera aktiviteter överlappar tidsmässigt
+  placeras de automatiskt bredvid varandra i samma kolumn.
+*/
+
+const SCHEDULES = [
+  {
+    //title: "Måndag–Fredag",
+    days: ["Måndag", "Tisdag", "Onsdag", "Torsdag", "Fredag"],
+    start: "15:30",
+    end: "22:15",
+    events: [
+
+      // MÅNDAG
+      {day:0, title:"Grund Åk 1–3", start:"17:00", end:"18:15", type:"yellow"},
+      {day:0, title:"Grund Åk 4–6", start:"18:15", end:"19:45", type:"green"},
+      {day:0, title:"Fortsättning 13+ år", start:"19:45", end:"21:15", type:"blue"},
+      {day:0, title:"Grund 13-20 år", start:"19:45", end:"21:15", type:"blue-light"},
+
+      // TISDAG
+      {day:1, title:"Grund Åk 4–6", start:"15:45", end:"17:00", type:"green"},
+      {day:1, title:"Grund Åk 1–3", start:"15:45", end:"17:00", type:"yellow"},
+      {day:1, title:"Grund Åk 1–3", start:"17:00", end:"18:15", type:"yellow"},
+      {day:1, title:"Fortsättning Åk 4-6 ", start:"18:15", end:"19:45", type:"green-dark"},
+      {day:1, title:"Grund 21+ år", start:"19:45", end:"21:15", type:"purple"},
+      {day:1, title:"Avancerad 13+ år", start:"19:45", end:"21:30", type:"red"},
+
+      // ONSDAG
+      {day:2, title:"Grund Åk 1–3", start:"17:00", end:"18:15", type:"yellow"},
+      {day:2, title:"Grund Åk 4–6", start:"18:15", end:"19:45", type:"green"},
+      {day:2, title:"Fortsättning 13+ år", start:"19:45", end:"21:15", type:"blue"},
+      {day:2, title:"Grund 13-20 år", start:"19:45", end:"21:15", type:"blue-light"},
+      // Detta pass ligger parallellt med de tre ovanför:
+      {day:2, title:"Avancerad Åk 4–6", start:"18:30", end:"20:15", type:"orange"},
+      
+
+      // TORSDAG
+      {day:3, title:"Grund Åk 1–3", start:"15:45", end:"17:00", type:"yellow"},
+      {day:3, title:"Grund Åk 1–3", start:"17:00", end:"18:15", type:"yellow"},
+      {day:3, title:"Fortsättning Åk 4–6", start:"18:15", end:"19:45", type:"green-dark"},
+      {day:3, title:"Avancerad 13+", start:"19:45", end:"21:30", type:"red"},
+      {day:3, title:"Grund 21+ år", start:"19:45", end:"21:15", type:"purple"},
+
+      // FREDAG
+      {day:4, title:"Grund Åk 1–3", start:"17:00", end:"18:15", type:"yellow"},
+      {day:4, title:"Grund Åk 4–6", start:"18:15", end:"19:45", type:"green"},
+      {day:4, title:"Open Gym Endast 15+ år", start:"19:45", end:"22:00", type:"grey"}
+    ]
+  },
+  {
+    //title: "Lördag–Söndag",
+    days: ["Lördag", "Söndag"],
+    start: "08:45",
+    end: "17:15",
+    events: [
+      // LÖRDAG
+      {day:0, title:"Barn parkour 4-6 år - 18", start:"09:00", end:"09:45", type:"teal"},
+      {day:0, title:"Barn parkour 4-6 år - 18", start:"10:00", end:"10:45", type:"teal"},
+      {day:0, title:"Familj parkour - 22", start:"11:00", end:"12:00", type:"mint"},
+      {day:0, title:"Open gym - Alla åldrar", start:"12:00", end:"14:30", type:"grey"},
+      {day:0, title:"Open gym - Endast 11+ år", start:"14:30", end:"16:30", type:"grey"},
+
+      // SÖNDAG
+      {day:1, title:"Kalas / Event / Uthyrning", start:"10:00", end:"12:00", type:"red"},
+      {day:1, title:"Kalas / Event / Uthyrning", start:"12:30", end:"14:30", type:"red"},
+      {day:1, title:"Kalas / Event / Uthyrning", start:"15:00", end:"17:00", type:"red"}
+    ]
+  }
+];
+
+
+// ============================================================
+// HJÄLPFUNKTIONER
+// ============================================================
+
+const SLOT_MINUTES = 15;   // varje rad på tidsaxeln
+const ROW_HEIGHT = 22;     // px per rad
+const LANE_MIN_WIDTH = 100; // minsta bredd (px) per parallellt pass, så texten förblir läsbar
+
+function minutes(t){
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function formatTime(total){
+  const h = String(Math.floor(total / 60)).padStart(2, "0");
+  const m = String(total % 60).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+function el(tag, className, parent){
+  const node = document.createElement(tag);
+  if(className) node.className = className;
+  if(parent) parent.appendChild(node);
+  return node;
+}
+
+function escapeHtml(text){
+  const map = {"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"};
+  return text.replace(/[&<>"]/g, c => map[c]);
+}
+
+
+// ============================================================
+// BERÄKNA PARALLELLA AKTIVITETER
+// ============================================================
+
+function overlaps(a, b){
+  return minutes(a.start) < minutes(b.end) &&
+         minutes(a.end) > minutes(b.start);
+}
+
+/*
+  Aktiviteter som överlappar (direkt eller via kedja) bildar en grupp.
+  Inom en grupp får varje aktivitet en "lane" och delar på bredden.
+  Aktiviteter som är ensamma i sin tid får hela kolumnbredden.
+  Pass breddas åt höger över lanes som är lediga under hela passet.
+  Ett pass som löper över flera andra pass som inte överlappar
+  varandra ("överbryggande pass") placeras längst till höger.
+  Indata ändras inte.
+*/
+function calculateLayout(dayEvents){
+  const sorted = [...dayEvents].sort(
+    (a, b) => minutes(a.start) - minutes(b.start)
+  );
+
+  // 1. Dela upp i grupper av överlappande aktiviteter
+  const groups = [];
+  let groupEnd = -1;
+  sorted.forEach(event => {
+    if(minutes(event.start) >= groupEnd){
+      groups.push([]);
+    }
+    groups[groups.length - 1].push(event);
+    groupEnd = Math.max(groupEnd, minutes(event.end));
+  });
+
+  // 2. Placera varje grupp i lanes
+  const placed = [];
+  groups.forEach(group => {
+
+    // Överbryggande pass: överlappar två pass som inte överlappar varandra
+    const spans = event => {
+      const others = group.filter(o => o !== event && overlaps(event, o));
+      return others.some(a => others.some(b => a !== b && !overlaps(a, b)));
+    };
+
+    // Överbryggande pass placeras sist, alltså längst till höger
+    const ordered = [
+      ...group.filter(e => !spans(e)),
+      ...group.filter(spans)
+    ];
+
+    const lanes = [];
+    const items = ordered.map(event => {
+      let lane = 0;
+      while(lanes[lane] && lanes[lane].some(other => overlaps(event, other))){
+        lane++;
+      }
+      (lanes[lane] = lanes[lane] || []).push(event);
+      return {event, lane};
+    });
+
+    // Bredda varje pass åt höger över lanes som är lediga under hela passet
+    items.forEach(item => {
+      let span = 1;
+      while(item.lane + span < lanes.length &&
+            !lanes[item.lane + span].some(o => overlaps(item.event, o))){
+        span++;
+      }
+      item.span = span;
+      item.laneCount = lanes.length;
+      placed.push(item);
+    });
+  });
+
+  return placed;
+}
+
+
+// ============================================================
+// RENDERING
+// ============================================================
+
+function renderEvent({event, lane, span, laneCount}, startMinutes, parent){
+  const top = (minutes(event.start) - startMinutes) / SLOT_MINUTES * ROW_HEIGHT;
+  const height = (minutes(event.end) - minutes(event.start)) / SLOT_MINUTES * ROW_HEIGHT;
+  const laneWidth = 100 / laneCount;
+
+  const node = el("div", `event ${event.type}`, parent);
+  node.style.left = `calc(${lane * laneWidth}% + 2px)`;
+  node.style.width = `calc(${laneWidth * span}% - 4px)`;
+  node.style.top = top + "px";
+  node.style.height = Math.max(height - 2, 18) + "px";
+  node.innerHTML =
+    `<strong>${escapeHtml(event.title)}</strong>
+     <small>${event.start}–${event.end}</small>`;
+}
+
+function renderSchedule(container, {title, days, start, end, events}){
+  const startMinutes = minutes(start);
+  const endMinutes = minutes(end);
+  const bodyHeight = (endMinutes - startMinutes) / SLOT_MINUTES * ROW_HEIGHT;
+
+  if(title){
+    el("h2", "schedule-title", container).textContent = title;
+  }
+
+  const wrap = el("div", "schedule-wrap", container);
+  const grid = el("div", "schedule", wrap);
+  grid.style.setProperty("--row-height", ROW_HEIGHT + "px");
+
+  // Layout för varje dag, och minsta kolumnbredd utifrån antal parallella pass
+  const layouts = days.map((_, dayIndex) =>
+    calculateLayout(events.filter(e => e.day === dayIndex)));
+  const columnMins = layouts.map(layout =>
+    Math.max(1, ...layout.map(p => p.laneCount)) * LANE_MIN_WIDTH);
+
+  grid.style.gridTemplateColumns =
+    `var(--time-width) ${columnMins.map(w => `minmax(${w}px, 1fr)`).join(" ")}`;
+  grid.style.minWidth =
+    `calc(var(--time-width) + ${columnMins.reduce((a, b) => a + b, 0)}px)`;
+
+  // Header
+  el("div", "corner", grid);
+  days.forEach(name => {
+    el("div", "day", grid).textContent = name;
+  });
+
+  // Tidskolumn
+  const timeColumn = el("div", "time-column", grid);
+  timeColumn.style.height = bodyHeight + "px";
+  for(let t = startMinutes; t <= endMinutes; t += SLOT_MINUTES){
+    const label = el("div", "time", timeColumn);
+    label.style.top = (t - startMinutes) / SLOT_MINUTES * ROW_HEIGHT + "px";
+    label.textContent = formatTime(t);
+  }
+
+  // Dagskolumner + aktiviteter
+  layouts.forEach(layout => {
+    const column = el("div", "day-column", grid);
+    column.style.height = bodyHeight + "px";
+    layout.forEach(p => renderEvent(p, startMinutes, column));
+  });
+}
+
+const container = document.getElementById("schedules");
+SCHEDULES.forEach(schedule => renderSchedule(container, schedule));
+
+</script>
+
+</body>
+</html>
